@@ -12,12 +12,6 @@ QueueHandle_t xQueueData;
 // Tamanho da média móvel
 #define MOVING_AVERAGE_SIZE 5
 
-// Buffer para armazenar os últimos 5 dados
-int moving_average_buffer[MOVING_AVERAGE_SIZE] = {0};
-int moving_average_index = 0;
-int moving_average_sum = 0;
-
-
 // não mexer! Alimenta a fila com os dados do sinal
 void data_task(void *p) {
     vTaskDelay(pdMS_TO_TICKS(400));
@@ -32,32 +26,40 @@ void data_task(void *p) {
     }
 }
 
+// Função para calcular a média móvel
+int calculate_moving_average(int *buffer, int *index, int *sum, int new_data) {
+    // Subtrair o valor antigo (caso o buffer esteja cheio)
+    *sum -= buffer[*index];
+
+    // Armazenar o novo dado no buffer
+    buffer[*index] = new_data;
+
+    // Adicionar o novo valor à soma
+    *sum += new_data;
+
+    // Atualizar o índice para o próximo valor no buffer
+    *index = (*index + 1) % MOVING_AVERAGE_SIZE;
+
+    // Calcular a média
+    return *sum / MOVING_AVERAGE_SIZE;
+}
+
 void process_task(void *p) {
     int data = 0;
+
+    // Variáveis locais para o filtro de média móvel
+    int moving_average_buffer[MOVING_AVERAGE_SIZE] = {0};
+    int moving_average_index = 0;
+    int moving_average_sum = 0;
 
     while (true) {
         if (xQueueReceive(xQueueData, &data, 100)) {
             // implementar filtro aqui!
-            // Subtrair o valor antigo (caso o buffer esteja cheio)
-            moving_average_sum -= moving_average_buffer[moving_average_index];
-
-            // Armazenar o novo dado no buffer
-            moving_average_buffer[moving_average_index] = data;
-
-            // Adicionar o novo valor à soma
-            moving_average_sum += data;
-
-            // Atualizar o índice para o próximo valor no buffer
-            moving_average_index = (moving_average_index + 1) % MOVING_AVERAGE_SIZE;
-
-            // Calcular a média
-            int moving_average = moving_average_sum / MOVING_AVERAGE_SIZE;
+            // Calcular a média móvel
+            int filtered_data = calculate_moving_average(moving_average_buffer, &moving_average_index, &moving_average_sum, data);
 
             // Imprimir o dado filtrado na UART
-            printf("Filtered Data: %d\n", moving_average);
-
-
-
+            printf("Filtered Data: %d\n", filtered_data);
 
             // deixar esse delay!
             vTaskDelay(pdMS_TO_TICKS(50));
